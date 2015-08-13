@@ -1,0 +1,156 @@
+/*指定網站字體*/
+body {
+  font-family: "Roboto Slab","Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+
+/*移除連結標籤的下底線樣式*/
+a {
+  text-decoration: none;
+}
+
+/*設定內容排版*/
+.container {
+  width: 1170px;
+  padding-right: 15px;
+  padding-left: 15px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+/*首頁文字區塊排版*/
+header .intro-text {
+  padding-top: 300px;
+  padding-bottom: 200px;
+}
+
+/*於首頁內容加入背景圖片*/
+header {
+  text-align: center;
+  color: #fff;
+  background-image: url(../images/header-bg.jpg);
+  /*設定首頁的背景圖片為水平、垂直置中*/
+  background-position: center center;
+  /*設定首頁的背景圖片居中並占滿整個內容版面*/
+  background-size: cover;
+}
+
+/*設定logo文字樣式*/
+.navbar-brand {
+  /*float是CSS的屬性，影響頁面的呈現位置、做為排版使用的屬性*/
+  /*float: left; 代表靠左浮動*/
+  float: left;
+  height: 50px;
+  padding: 15px 15px;
+  /*瀏覽器預設的 em 大小是 16 px*/
+  /*2em=32px*/
+  font-size: 2em;
+}
+
+/*li的文字靠左浮動，將直向列表變成橫向，避免擠斷到後方的元素到下一列*/
+.navbar-nav>li {
+  float: left;
+}
+
+/*設定navbar靠右浮動*/
+.navbar-right {
+  float: right;
+}
+
+/*設定navbar上下留白*/
+.navbar-default {
+  padding: 25px 0;
+}
+
+/*設定navbar為固定置中位置*/
+.navbar-fixed-bottom, .navbar-fixed-top {
+  position: fixed;
+  right: 0;
+  left: 0;
+}
+
+/*設定LOGO的字體和顏色樣式*/
+.navbar-default .navbar-brand {
+  font-family: 'Lato', sans-serif;
+  color: #fed136;
+}
+
+/*設定選單文字的字體和顏色等樣式*/
+.navbar-default .nav li a {
+  text-transform: uppercase;
+  font-family: Montserrat,"Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-weight: 400;
+  letter-spacing: 1px;
+  color: #666;
+}
+
+
+/*設定選單文字為相對位置且定義上下左右留白距離*/
+.nav>li>a {
+  position: relative;
+  display: block;
+  padding: 10px 15px;
+}
+
+/*設定首頁主標題字體樣式等*/
+header .intro-text .intro-heading {
+  margin-bottom: 50px;
+  text-transform: uppercase;
+  font-family: Montserrat,"Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-size: 75px;
+  font-weight: 700;
+  line-height: 75px;
+}
+
+/*設定首頁副標題字體樣式等*/
+header .intro-text .intro-lead-in {
+  margin-bottom: 25px;
+  font-family: "Droid Serif","Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-size: 40px;
+  font-style: italic;
+  line-height: 40px;
+}
+
+/*設定首頁"MORE"按鈕樣式*/
+.btn-more {
+  padding: 20px 40px;
+  border-color: #fed136;
+  border-radius: 3px;
+  text-transform: uppercase;
+  font-family: Montserrat,"Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  background-color: #fed136;
+}
+
+/*設定footer內容上下留白25px並置中對齊*/
+footer {
+  padding: 25px 0;
+}
+
+/*設定footer-copyright文字樣式並靠左浮動*/
+footer span.copyright {
+  font-family: Montserrat,"Helvetica Neue",Helvetica,Arial,sans-serif;
+  line-height: 40px;
+  float: left;
+}
+
+/*設定footer-contact區塊的樣式並靠右浮動*/
+.footer-contact {
+  padding-left: 0;
+  margin-left: -5px;
+  list-style: none;
+  float: right;
+}
+
+/*設定footer-contact文字的樣式並左右留白*/
+.footer-contact>li {
+  display: inline-block;
+  padding-right: 5px;
+  padding-left: 5px;
+}
+
+/*設定連結顏色*/
+a {
+  color: #fed136;
+}
