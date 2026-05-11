@@ -2,140 +2,241 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 
-const TWSE_BASE = 'https://www.twse.com.tw';
 const MIS_BASE = 'https://mis.twse.com.tw';
+const TWSE_BASE = 'https://www.twse.com.tw';
 const OPENAPI_BASE = 'https://openapi.twse.com.tw';
+const TPEX_BASE = 'https://www.tpex.org.tw';
 
-const axiosConfig = {
-  timeout: 10000,
-  headers: {
-    'User-Agent': 'Mozilla/5.0 (compatible; StockDashboard/1.0)',
-    'Accept': 'application/json',
-  },
+const ax = {
+  timeout: 12000,
+  headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StockDashboard/1.0)' },
 };
 
-// GET /api/stocks/quote/:code
-// 取得個股即時報價 (上市用 tse, 上櫃用 otc)
+// ── In-memory cache ────────────────────────────────────────
+const _cache = {};
+function getCache(key) {
+  const e = _cache[key];
+  return e && Date.now() - e.ts < 5 * 60 * 1000 ? e.data : null;
+}
+function setCache(key, data) { _cache[key] = { data, ts: Date.now() }; }
+
+// ── Helpers ────────────────────────────────────────────────
+function twToISO(twDate) {
+  const [y, m, d] = twDate.replace(/\//g, '-').split('-');
+  return `${parseInt(y) + 1911}-${m}-${d}`;
+}
+
+function todayStr() {
+  const n = new Date();
+  return `${n.getFullYear()}${String(n.getMonth() + 1).padStart(2, '0')}${String(n.getDate()).padStart(2, '0')}`;
+}
+
+function twYearMonth() {
+  const n = new Date();
+  return `${n.getFullYear() - 1911}/${String(n.getMonth() + 1).padStart(2, '0')}`;
+}
+
+async function fetchTseList() {
+  const cached = getCache('tse_list');
+  if (cached) return cached;
+  const r = await axios.get(`${OPENAPI_BASE}/v1/exchangeReport/STOCK_DAY_ALL`, { ...ax, timeout: 20000 });
+  setCache('tse_list', r.data);
+  return r.data;
+}
+
+async function fetchOtcList() {
+  const cached = getCache('otc_list');
+  if (cached) return cached;
+  const r = await axios.get(`${TPEX_BASE}/openapi/v1/tpex_mainboard_daily_close_quotes`, { ...ax, timeout: 20000 });
+  setCache('otc_list', r.data);
+  return r.data;
+}
+
+function num(s) { return parseFloat((s || '').toString().replace(/,/g, '')); }
+
+// ── Quote (auto-detect TSE / OTC) ─────────────────────────
 router.get('/quote/:code', async (req, res) => {
+  const { code } = req.params;
+
+  async function tryMarket(market) {
+    const r = await axios.get(
+      `${MIS_BASE}/stock/api/getStockInfo.jsp?ex_ch=${market}_${code}.tw&json=1&delay=0`, ax
+    );
+    return r.data;
+  }
+
+  try {
+    let data = await tryMarket('tse');
+    let market = 'tse';
+    if (!data.msgArray?.length) { data = await tryMarket('otc'); market = 'otc'; }
+    if (!data.msgArray?.length) return res.status(404).json({ error: '找不到股票代號' });
+
+    const s = data.msgArray[0];
+    const price = parseFloat(s.z) || parseFloat(s.y);
+    const prev = parseFloat(s.y);
+    const chg = parseFloat((price - prev).toFixed(2));
+
+    res.json({
+      code: s.c, name: s.n, market,
+      price, open: num(s.o), high: num(s.h), low: num(s.l), close: prev,
+      change: chg,
+      changePercent: ((chg / prev) * 100).toFixed(2),
+      volume: parseInt(s.v) || 0,
+      time: s.t, date: s.d,
+    });
+  } catch (e) {
+    res.status(500).json({ error: '無法取得即時報價', detail: e.message });
+  }
+});
+
+// ── History (TSE or OTC) ──────────────────────────────────
+router.get('/history/:code', async (req, res) => {
   const { code } = req.params;
   const market = req.query.market || 'tse';
 
   try {
-    const url = `${MIS_BASE}/stock/api/getStockInfo.jsp?ex_ch=${market}_${code}.tw&json=1&delay=0`;
-    const response = await axios.get(url, axiosConfig);
-    const data = response.data;
+    if (market === 'otc') {
+      const url = `${TPEX_BASE}/web/stock/aftertrading/daily_trading_info/st43_result.php` +
+        `?l=zh-tw&d=${twYearMonth()}&stkno=${code}&s=0,asc,0`;
+      const r = await axios.get(url, ax);
+      const rows = r.data?.aaData || [];
+      if (!rows.length) return res.status(404).json({ error: '無歷史資料' });
 
-    if (!data.msgArray || data.msgArray.length === 0) {
-      return res.status(404).json({ error: '找不到股票代號' });
+      const history = rows.map(row => ({
+        date: twToISO(row[0]),
+        volume: parseInt((row[1] || '0').replace(/,/g, '')),
+        open: num(row[3]), high: num(row[4]), low: num(row[5]), close: num(row[6]),
+      })).filter(r => !isNaN(r.close) && r.close > 0);
+
+      return res.json({ code, history });
     }
 
-    const stock = data.msgArray[0];
-    const result = {
-      code: stock.c,
-      name: stock.n,
-      price: parseFloat(stock.z) || parseFloat(stock.y),
-      open: parseFloat(stock.o),
-      high: parseFloat(stock.h),
-      low: parseFloat(stock.l),
-      close: parseFloat(stock.y),
-      change: parseFloat(stock.z) - parseFloat(stock.y),
-      changePercent: (((parseFloat(stock.z) - parseFloat(stock.y)) / parseFloat(stock.y)) * 100).toFixed(2),
-      volume: parseInt(stock.v),
-      time: stock.t,
-      date: stock.d,
-    };
-
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: '無法取得即時報價', detail: err.message });
-  }
-});
-
-// GET /api/stocks/history/:code
-// 取得個股近月歷史資料 (上市)
-router.get('/history/:code', async (req, res) => {
-  const { code } = req.params;
-  const date = req.query.date || formatDate(new Date());
-
-  try {
-    const url = `${TWSE_BASE}/rwd/zh/afterTrading/STOCK_DAY?stockNo=${code}&date=${date}&response=json`;
-    const response = await axios.get(url, axiosConfig);
-    const data = response.data;
-
-    if (data.stat !== 'OK' || !data.data) {
-      return res.status(404).json({ error: '無歷史資料' });
-    }
+    // TSE
+    const url = `${TWSE_BASE}/rwd/zh/afterTrading/STOCK_DAY?stockNo=${code}&date=${todayStr()}&response=json`;
+    const r = await axios.get(url, ax);
+    const data = r.data;
+    if (data.stat !== 'OK' || !data.data) return res.status(404).json({ error: '無歷史資料' });
 
     const history = data.data.map(row => ({
-      date: row[0].replace(/\//g, '-'),
-      open: parseFloat(row[3].replace(/,/g, '')),
-      high: parseFloat(row[4].replace(/,/g, '')),
-      low: parseFloat(row[5].replace(/,/g, '')),
-      close: parseFloat(row[6].replace(/,/g, '')),
-      volume: parseInt(row[1].replace(/,/g, '')),
-    }));
+      date: twToISO(row[0]),
+      volume: parseInt((row[1] || '0').replace(/,/g, '')),
+      open: num(row[3]), high: num(row[4]), low: num(row[5]), close: num(row[6]),
+    })).filter(r => !isNaN(r.close) && r.close > 0);
 
-    res.json({ code, title: data.title, history });
-  } catch (err) {
-    res.status(500).json({ error: '無法取得歷史資料', detail: err.message });
+    res.json({ code, history });
+  } catch (e) {
+    res.status(500).json({ error: '無法取得歷史資料', detail: e.message });
   }
 });
 
-// GET /api/stocks/index
-// 取得加權指數
+// ── TAIEX Index ───────────────────────────────────────────
 router.get('/index', async (req, res) => {
   try {
-    const url = `${MIS_BASE}/stock/api/getStockInfo.jsp?ex_ch=tse_t00.tw&json=1&delay=0`;
-    const response = await axios.get(url, axiosConfig);
-    const data = response.data;
+    const r = await axios.get(`${MIS_BASE}/stock/api/getStockInfo.jsp?ex_ch=tse_t00.tw&json=1&delay=0`, ax);
+    const idx = r.data?.msgArray?.[0];
+    if (!idx) return res.status(404).json({ error: '無法取得大盤資料' });
 
-    if (!data.msgArray || data.msgArray.length === 0) {
-      return res.status(404).json({ error: '無法取得大盤資料' });
-    }
+    const price = parseFloat(idx.z) || parseFloat(idx.y);
+    const prev = parseFloat(idx.y);
+    const chg = price - prev;
 
-    const idx = data.msgArray[0];
     res.json({
-      name: idx.n,
-      price: parseFloat(idx.z) || parseFloat(idx.y),
-      close: parseFloat(idx.y),
-      change: (parseFloat(idx.z) - parseFloat(idx.y)).toFixed(2),
-      changePercent: (((parseFloat(idx.z) - parseFloat(idx.y)) / parseFloat(idx.y)) * 100).toFixed(2),
-      volume: idx.v,
-      time: idx.t,
+      name: idx.n, price, close: prev,
+      change: chg.toFixed(2),
+      changePercent: ((chg / prev) * 100).toFixed(2),
+      volume: idx.v, time: idx.t,
     });
-  } catch (err) {
-    res.status(500).json({ error: '無法取得大盤資料', detail: err.message });
+  } catch (e) {
+    res.status(500).json({ error: '無法取得大盤資料', detail: e.message });
   }
 });
 
-// GET /api/stocks/search?q=2330
-// 從上市股票清單搜尋
+// ── Search (TSE + OTC) ────────────────────────────────────
 router.get('/search', async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: '請輸入搜尋關鍵字' });
 
   try {
-    const url = `${OPENAPI_BASE}/v1/exchangeReport/STOCK_DAY_ALL`;
-    const response = await axios.get(url, { ...axiosConfig, timeout: 15000 });
-    const list = response.data;
+    const [tse, otc] = await Promise.allSettled([fetchTseList(), fetchOtcList()]);
+    const kw = q.toLowerCase();
+    const results = [];
 
-    const keyword = q.toLowerCase();
-    const results = list
-      .filter(s => s.Code.includes(keyword) || s.Name.toLowerCase().includes(keyword))
-      .slice(0, 20)
-      .map(s => ({ code: s.Code, name: s.Name, close: s.ClosingPrice }));
+    if (tse.status === 'fulfilled') {
+      tse.value
+        .filter(s => s.Code?.includes(kw) || s.Name?.toLowerCase().includes(kw))
+        .slice(0, 10)
+        .forEach(s => results.push({ code: s.Code, name: s.Name, market: 'tse', close: s.ClosingPrice }));
+    }
 
-    res.json(results);
-  } catch (err) {
-    res.status(500).json({ error: '搜尋失敗', detail: err.message });
+    if (otc.status === 'fulfilled') {
+      otc.value
+        .filter(s => {
+          const code = s.SecuritiesCompanyCode || s.Code || '';
+          const name = s.CompanyName || s.Name || '';
+          return code.includes(kw) || name.toLowerCase().includes(kw);
+        })
+        .slice(0, 10)
+        .forEach(s => results.push({
+          code: s.SecuritiesCompanyCode || s.Code,
+          name: s.CompanyName || s.Name,
+          market: 'otc',
+          close: s.Close || s.ClosingPrice,
+        }));
+    }
+
+    res.json(results.slice(0, 20));
+  } catch (e) {
+    res.status(500).json({ error: '搜尋失敗', detail: e.message });
   }
 });
 
-function formatDate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}${m}${d}`;
-}
+// ── Ranking (top gainers / losers) ────────────────────────
+router.get('/ranking', async (req, res) => {
+  try {
+    const [tse, otc] = await Promise.allSettled([fetchTseList(), fetchOtcList()]);
+    const stocks = [];
+
+    if (tse.status === 'fulfilled') {
+      tse.value.forEach(s => {
+        const close = num(s.ClosingPrice);
+        const change = num(s.Change);
+        if (!isNaN(close) && close > 0 && !isNaN(change)) {
+          const prev = close - change;
+          stocks.push({
+            code: s.Code, name: s.Name, market: 'tse',
+            close, change,
+            changePercent: prev > 0 ? +((change / prev) * 100).toFixed(2) : 0,
+          });
+        }
+      });
+    }
+
+    if (otc.status === 'fulfilled') {
+      otc.value.forEach(s => {
+        const code = s.SecuritiesCompanyCode || s.Code;
+        const name = s.CompanyName || s.Name;
+        const close = num(s.Close || s.ClosingPrice);
+        const change = num(s.Change || s.PriceChange);
+        if (code && !isNaN(close) && close > 0 && !isNaN(change)) {
+          const prev = close - change;
+          stocks.push({
+            code, name, market: 'otc',
+            close, change,
+            changePercent: prev > 0 ? +((change / prev) * 100).toFixed(2) : 0,
+          });
+        }
+      });
+    }
+
+    const sorted = [...stocks].sort((a, b) => b.changePercent - a.changePercent);
+
+    res.json({
+      gainers: sorted.slice(0, 10),
+      losers: sorted.slice(-10).reverse(),
+    });
+  } catch (e) {
+    res.status(500).json({ error: '無法取得排行資料', detail: e.message });
+  }
+});
 
 module.exports = router;

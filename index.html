@@ -6,18 +6,14 @@
   <title>台股儀表板</title>
   <link rel="stylesheet" href="css/reset.css">
   <link rel="stylesheet" href="css/main.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
+
   <nav class="navbar">
-    <div class="container">
-      <div class="navbar-brand">
-        <span class="logo-icon">📈</span>
-        台股儀表板
-      </div>
-      <div class="navbar-right">
-        <span id="market-time" class="market-time">--</span>
-      </div>
+    <div class="container nav-inner">
+      <div class="navbar-brand">📈 台股儀表板</div>
+      <span id="market-time" class="market-time">--</span>
     </div>
   </nav>
 
@@ -29,20 +25,15 @@
         <div class="index-label">加權指數 TAIEX</div>
         <div class="index-price" id="taiex-price">--</div>
         <div class="index-change" id="taiex-change">--</div>
-        <div class="index-meta" id="taiex-meta">更新中...</div>
+        <div class="index-meta" id="taiex-meta">載入中...</div>
       </div>
     </section>
 
-    <!-- 搜尋區 -->
+    <!-- 搜尋 -->
     <section class="search-section">
       <div class="search-bar">
-        <input
-          type="text"
-          id="search-input"
-          class="search-input"
-          placeholder="輸入股票代號或名稱，例如：2330 或 台積電"
-          autocomplete="off"
-        />
+        <input type="text" id="search-input" class="search-input"
+          placeholder="輸入股票代號或名稱（上市/上櫃均可）" autocomplete="off">
         <button id="search-btn" class="search-btn">查詢</button>
       </div>
       <div id="search-results" class="search-results hidden"></div>
@@ -51,60 +42,79 @@
     <!-- 股票資訊卡 -->
     <section id="stock-section" class="stock-section hidden">
       <div class="stock-header">
-        <div>
+        <div class="stock-header-left">
           <h2 id="stock-name" class="stock-name">--</h2>
-          <span id="stock-code" class="stock-code-badge">--</span>
+          <div class="stock-badges">
+            <span id="stock-code-badge" class="badge badge-code">--</span>
+            <span id="stock-market-badge" class="badge badge-market">--</span>
+          </div>
         </div>
-        <div class="stock-price-block">
+        <div class="stock-header-right">
           <div id="stock-price" class="stock-price">--</div>
           <div id="stock-change" class="stock-change">--</div>
+          <button id="watchlist-btn" class="watchlist-toggle-btn">☆ 加入自選</button>
         </div>
       </div>
 
       <div class="metrics-grid">
-        <div class="metric-card">
-          <div class="metric-label">開盤</div>
-          <div class="metric-value" id="m-open">--</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">最高</div>
-          <div class="metric-value" id="m-high">--</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">最低</div>
-          <div class="metric-value" id="m-low">--</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">昨收</div>
-          <div class="metric-value" id="m-close">--</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">成交張數</div>
-          <div class="metric-value" id="m-volume">--</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">更新時間</div>
-          <div class="metric-value" id="m-time">--</div>
-        </div>
+        <div class="metric-card"><div class="metric-label">開盤</div><div id="m-open" class="metric-value">--</div></div>
+        <div class="metric-card"><div class="metric-label">最高</div><div id="m-high" class="metric-value">--</div></div>
+        <div class="metric-card"><div class="metric-label">最低</div><div id="m-low" class="metric-value">--</div></div>
+        <div class="metric-card"><div class="metric-label">昨收</div><div id="m-close" class="metric-value">--</div></div>
+        <div class="metric-card"><div class="metric-label">成交張數</div><div id="m-volume" class="metric-value">--</div></div>
+        <div class="metric-card"><div class="metric-label">更新時間</div><div id="m-time" class="metric-value">--</div></div>
       </div>
 
-      <!-- 歷史走勢圖 -->
-      <div class="chart-container">
-        <div class="chart-title">近月收盤走勢</div>
-        <canvas id="price-chart"></canvas>
+      <div class="chart-section">
+        <div class="chart-toolbar">
+          <span class="chart-label">近月走勢</span>
+          <div class="chart-toggle">
+            <button class="chart-toggle-btn active" data-type="candlestick">K線</button>
+            <button class="chart-toggle-btn" data-type="area">折線</button>
+          </div>
+        </div>
+        <div id="price-chart" class="price-chart"></div>
       </div>
     </section>
 
-    <!-- 快速選股 -->
-    <section class="watchlist-section">
-      <h3 class="section-title">熱門股票</h3>
-      <div class="watchlist-grid" id="watchlist">
-        <button class="watchlist-btn" data-code="2330" data-name="台積電">2330 台積電</button>
-        <button class="watchlist-btn" data-code="2317" data-name="鴻海">2317 鴻海</button>
-        <button class="watchlist-btn" data-code="2454" data-name="聯發科">2454 聯發科</button>
-        <button class="watchlist-btn" data-code="2882" data-name="國泰金">2882 國泰金</button>
-        <button class="watchlist-btn" data-code="2412" data-name="中華電">2412 中華電</button>
-        <button class="watchlist-btn" data-code="2308" data-name="台達電">2308 台達電</button>
+    <!-- 自選股 + 熱門股票 -->
+    <div class="two-col">
+
+      <section class="watchlist-section">
+        <h3 class="section-title">⭐ 自選股清單</h3>
+        <div id="watchlist-list" class="watchlist-list">
+          <p class="empty-hint">查詢股票後點「☆ 加入自選」即可儲存</p>
+        </div>
+      </section>
+
+      <section class="quickpick-section">
+        <h3 class="section-title">🔥 熱門股票</h3>
+        <div class="quickpick-grid">
+          <button class="qp-btn" data-code="2330">2330 台積電</button>
+          <button class="qp-btn" data-code="2317">2317 鴻海</button>
+          <button class="qp-btn" data-code="2454">2454 聯發科</button>
+          <button class="qp-btn" data-code="2882">2882 國泰金</button>
+          <button class="qp-btn" data-code="2412">2412 中華電</button>
+          <button class="qp-btn" data-code="2308">2308 台達電</button>
+          <button class="qp-btn" data-code="6488">6488 環球晶 (櫃)</button>
+          <button class="qp-btn" data-code="3443">3443 創意電子 (櫃)</button>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- 排行榜 -->
+    <section class="ranking-section">
+      <div class="ranking-header">
+        <h3 class="section-title">📊 漲跌幅排行</h3>
+        <button id="ranking-refresh" class="refresh-btn">↻ 重新載入</button>
+      </div>
+      <div class="ranking-tabs">
+        <button class="rtab active" data-tab="gainers">漲幅 TOP 10</button>
+        <button class="rtab" data-tab="losers">跌幅 TOP 10</button>
+      </div>
+      <div id="ranking-list" class="ranking-list">
+        <div class="rank-loading">載入排行資料中（首次約需 10 秒）...</div>
       </div>
     </section>
 
@@ -112,7 +122,7 @@
 
   <footer class="footer">
     <div class="container">
-      <p>資料來源：台灣證券交易所 (TWSE)｜延遲約 15 分鐘｜僅供參考，不構成投資建議</p>
+      <p>資料來源：台灣證券交易所 (TWSE) ｜ 延遲約 15 分鐘 ｜ 僅供參考，不構成投資建議</p>
     </div>
   </footer>
 
