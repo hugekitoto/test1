@@ -1,64 +1,121 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-TW">
 <head>
-	<meta charset="UTF-8">
-	<title>CSS DEMO</title>
-	<link rel="stylesheet" href="css/reset.css">
-	<link rel="stylesheet" href="css/main.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台股儀表板</title>
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-default navbar-fixed-top">
-        <div class="container">
-            <!-- Brand and toggle get grouped for better mobile display -->
-            <div class="navbar-header">
-                <a class="navbar-brand" href="#page-top">Anna Studio</a>
-            </div>
-            <!-- Collect the nav links, forms, and other content for toggling -->
-            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-                <ul class="nav navbar-nav navbar-right">
-                    <li><a href=""></a></li>
-                    <li class=""><a href="">Services</a></li>
-                    <li><a href="">Portfolio</a></li>
-                    <li><a href="">About</a></li>
-                    <li><a href="">Team</a></li>
-                    <li><a href="">Contact</a></li>
-                </ul>
-            </div>
-            <!-- /.navbar-collapse -->
-        </div>
-        <!-- /.container-fluid -->
-    </nav>
+  <nav class="navbar">
+    <div class="container">
+      <div class="navbar-brand">
+        <span class="logo-icon">📈</span>
+        台股儀表板
+      </div>
+      <div class="navbar-right">
+        <span id="market-time" class="market-time">--</span>
+      </div>
+    </div>
+  </nav>
 
-    <!-- Header -->
-    <header>
-        <div class="container">
-            <div class="intro-text">
-                <div class="intro-lead-in">Welcome To Anna Studio.</div>
-                <div class="intro-heading">It's Nice To Meet You.</div>
-                <a class="btn-more">More</a>
-            </div>
-        </div>
-    </header>
+  <main class="container main-content">
 
-    <footer>
-        <div class="container">
-            <div>
-                <div>
-                    <span class="copyright">Copyright © Your Website 2014</span>
-                </div>
-                <div>
-                    <ul class="footer-contact">
-                        <li><a href="#">facebook</a></li>
-                        <li><a href="#">Google +</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </footer>
+    <!-- 大盤指數 -->
+    <section class="index-section">
+      <div class="index-card" id="taiex-card">
+        <div class="index-label">加權指數 TAIEX</div>
+        <div class="index-price" id="taiex-price">--</div>
+        <div class="index-change" id="taiex-change">--</div>
+        <div class="index-meta" id="taiex-meta">更新中...</div>
+      </div>
+    </section>
 
-</body>
-<body>
-	
+    <!-- 搜尋區 -->
+    <section class="search-section">
+      <div class="search-bar">
+        <input
+          type="text"
+          id="search-input"
+          class="search-input"
+          placeholder="輸入股票代號或名稱，例如：2330 或 台積電"
+          autocomplete="off"
+        />
+        <button id="search-btn" class="search-btn">查詢</button>
+      </div>
+      <div id="search-results" class="search-results hidden"></div>
+    </section>
+
+    <!-- 股票資訊卡 -->
+    <section id="stock-section" class="stock-section hidden">
+      <div class="stock-header">
+        <div>
+          <h2 id="stock-name" class="stock-name">--</h2>
+          <span id="stock-code" class="stock-code-badge">--</span>
+        </div>
+        <div class="stock-price-block">
+          <div id="stock-price" class="stock-price">--</div>
+          <div id="stock-change" class="stock-change">--</div>
+        </div>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">開盤</div>
+          <div class="metric-value" id="m-open">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">最高</div>
+          <div class="metric-value" id="m-high">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">最低</div>
+          <div class="metric-value" id="m-low">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">昨收</div>
+          <div class="metric-value" id="m-close">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">成交張數</div>
+          <div class="metric-value" id="m-volume">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">更新時間</div>
+          <div class="metric-value" id="m-time">--</div>
+        </div>
+      </div>
+
+      <!-- 歷史走勢圖 -->
+      <div class="chart-container">
+        <div class="chart-title">近月收盤走勢</div>
+        <canvas id="price-chart"></canvas>
+      </div>
+    </section>
+
+    <!-- 快速選股 -->
+    <section class="watchlist-section">
+      <h3 class="section-title">熱門股票</h3>
+      <div class="watchlist-grid" id="watchlist">
+        <button class="watchlist-btn" data-code="2330" data-name="台積電">2330 台積電</button>
+        <button class="watchlist-btn" data-code="2317" data-name="鴻海">2317 鴻海</button>
+        <button class="watchlist-btn" data-code="2454" data-name="聯發科">2454 聯發科</button>
+        <button class="watchlist-btn" data-code="2882" data-name="國泰金">2882 國泰金</button>
+        <button class="watchlist-btn" data-code="2412" data-name="中華電">2412 中華電</button>
+        <button class="watchlist-btn" data-code="2308" data-name="台達電">2308 台達電</button>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>資料來源：台灣證券交易所 (TWSE)｜延遲約 15 分鐘｜僅供參考，不構成投資建議</p>
+    </div>
+  </footer>
+
+  <script src="js/app.js"></script>
 </body>
 </html>
