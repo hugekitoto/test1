@@ -10,6 +10,9 @@
 </head>
 <body>
 
+  <!-- 警報觸發 Banner -->
+  <div id="alert-banner" class="alert-banner hidden"></div>
+
   <nav class="navbar">
     <div class="container nav-inner">
       <div class="navbar-brand">📈 台股儀表板</div>
@@ -52,7 +55,10 @@
         <div class="stock-header-right">
           <div id="stock-price" class="stock-price">--</div>
           <div id="stock-change" class="stock-change">--</div>
-          <button id="watchlist-btn" class="watchlist-toggle-btn">☆ 加入自選</button>
+          <div class="action-btns">
+            <button id="watchlist-btn" class="action-btn">☆ 自選股</button>
+            <button id="alert-btn" class="action-btn">🔔 設定警報</button>
+          </div>
         </div>
       </div>
 
@@ -62,12 +68,19 @@
         <div class="metric-card"><div class="metric-label">最低</div><div id="m-low" class="metric-value">--</div></div>
         <div class="metric-card"><div class="metric-label">昨收</div><div id="m-close" class="metric-value">--</div></div>
         <div class="metric-card"><div class="metric-label">成交張數</div><div id="m-volume" class="metric-value">--</div></div>
-        <div class="metric-card"><div class="metric-label">更新時間</div><div id="m-time" class="metric-value">--</div></div>
+        <div class="metric-card ma20-metric">
+          <div class="metric-label">20 日均線</div>
+          <div id="m-ma20" class="metric-value">--</div>
+        </div>
       </div>
 
       <div class="chart-section">
         <div class="chart-toolbar">
-          <span class="chart-label">近月走勢</span>
+          <span class="chart-label">近 2 月走勢</span>
+          <div class="chart-legend">
+            <span class="legend-dot" style="background:#fc8181;"></span>K線
+            <span class="legend-dot ma-dot"></span>MA20
+          </div>
           <div class="chart-toggle">
             <button class="chart-toggle-btn active" data-type="candlestick">K線</button>
             <button class="chart-toggle-btn" data-type="area">折線</button>
@@ -77,13 +90,21 @@
       </div>
     </section>
 
+    <!-- 警報管理 -->
+    <section id="alert-section" class="alert-section hidden">
+      <div class="alert-section-header">
+        <h3 class="section-title">🔔 MA20 警報監控</h3>
+        <span id="alert-poll-status" class="poll-status">監控中...</span>
+      </div>
+      <div id="alert-list" class="alert-list"></div>
+    </section>
+
     <!-- 自選股 + 熱門股票 -->
     <div class="two-col">
-
       <section class="watchlist-section">
         <h3 class="section-title">⭐ 自選股清單</h3>
         <div id="watchlist-list" class="watchlist-list">
-          <p class="empty-hint">查詢股票後點「☆ 加入自選」即可儲存</p>
+          <p class="empty-hint">查詢股票後點「☆ 自選股」即可儲存</p>
         </div>
       </section>
 
@@ -100,7 +121,6 @@
           <button class="qp-btn" data-code="3443">3443 創意電子 (櫃)</button>
         </div>
       </section>
-
     </div>
 
     <!-- 排行榜 -->
@@ -122,7 +142,7 @@
 
   <footer class="footer">
     <div class="container">
-      <p>資料來源：台灣證券交易所 (TWSE) ｜ 延遲約 15 分鐘 ｜ 僅供參考，不構成投資建議</p>
+      <p>資料來源：台灣證券交易所 (TWSE) ｜ 延遲約 15 分鐘 ｜ 警報每 30 秒檢查一次 ｜ 僅供參考，不構成投資建議</p>
     </div>
   </footer>
 

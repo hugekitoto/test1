@@ -3,10 +3,26 @@ const API_BASE = '/api/stocks';
 // ── State ──────────────────────────────────────────────────
 let chartInstance = null;
 let chartType = 'candlestick';
-let currentStock = null;    // { code, name, market }
+let currentStock = null;        // { code, name, market }
+let currentHistory = [];        // last fetched history (for chart re-render)
 let rankingData = null;
 let activeTab = 'gainers';
+
 let watchlist = (() => { try { return JSON.parse(localStorage.getItem('tw_watchlist') || '[]'); } catch { return []; } })();
+let alerts    = (() => { try { return JSON.parse(localStorage.getItem('tw_alerts')    || '[]'); } catch { return []; } })();
+
+// ── Persistence ────────────────────────────────────────────
+function saveWatchlist() { localStorage.setItem('tw_watchlist', JSON.stringify(watchlist)); }
+function saveAlerts()    { localStorage.setItem('tw_alerts',    JSON.stringify(alerts)); }
+
+// ── MA20 helper ────────────────────────────────────────────
+function calcMA20(history) {
+  return history.map((d, i) => {
+    if (i < 19) return null;
+    const avg = history.slice(i - 19, i + 1).reduce((s, x) => s + x.close, 0) / 20;
+    return { time: d.date, value: parseFloat(avg.toFixed(2)) };
+  }).filter(Boolean);
+}
 
 // ── Index ──────────────────────────────────────────────────
 async function loadIndex() {
@@ -24,7 +40,6 @@ async function loadIndex() {
     const el = document.getElementById('taiex-change');
     el.textContent = `${isUp ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)} (${isUp ? '+' : ''}${pct}%)`;
     el.className = `index-change ${isUp ? 'up' : 'down'}`;
-
     document.getElementById('taiex-meta').textContent = `更新：${d.time}`;
     document.getElementById('taiex-card').className = `index-card ${isUp ? 'up' : 'down'}`;
   } catch {
@@ -80,7 +95,7 @@ async function loadStock(code, market = null) {
   section.classList.remove('hidden');
   document.getElementById('stock-price').textContent = '載入中...';
   document.getElementById('stock-change').textContent = '';
-
+  document.getElementById('m-ma20').textContent = '--';
   destroyChart();
 
   try {
@@ -91,10 +106,24 @@ async function loadStock(code, market = null) {
     currentStock = { code: quote.code, name: quote.name, market: quote.market };
     renderQuote(quote);
     updateWatchlistBtn();
+    updateAlertBtn();
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    const hist = await fetch(`${API_BASE}/history/${code}?market=${quote.market}`).then(r => r.json());
-    if (!hist.error && hist.history?.length) renderChart(hist.history);
+    // Fetch 2 months so MA20 has enough data
+    const hist = await fetch(`${API_BASE}/history/${code}?market=${quote.market}&months=2`).then(r => r.json());
+    if (!hist.error && hist.history?.length) {
+      currentHistory = hist.history;
+      renderChart(hist.history);
+
+      // Show current MA20 in metrics
+      const ma20Data = calcMA20(hist.history);
+      if (ma20Data.length) {
+        const latest = ma20Data[ma20Data.length - 1].value;
+        const maEl = document.getElementById('m-ma20');
+        maEl.textContent = latest.toFixed(2);
+        maEl.className = `metric-value ${quote.price > latest ? 'up' : 'down'}`;
+      }
+    }
   } catch {
     document.getElementById('stock-price').textContent = '查詢失敗';
   }
@@ -147,25 +176,36 @@ function renderChart(history) {
     timeScale: { borderColor: '#2d3748' },
   });
 
-  const data = history.map(d => ({
-    time: d.date, open: d.open, high: d.high, low: d.low, close: d.close,
-  }));
+  const ohlc = history.map(d => ({ time: d.date, open: d.open, high: d.high, low: d.low, close: d.close }));
 
   if (chartType === 'candlestick') {
-    const s = chartInstance.addCandlestickSeries({
+    const cs = chartInstance.addCandlestickSeries({
       upColor: '#e53e3e', downColor: '#38a169',
       borderVisible: false,
       wickUpColor: '#e53e3e', wickDownColor: '#38a169',
     });
-    s.setData(data);
+    cs.setData(ohlc);
   } else {
-    const s = chartInstance.addAreaSeries({
+    const as = chartInstance.addAreaSeries({
       lineColor: '#4a90d9',
       topColor: 'rgba(74,144,217,0.25)',
       bottomColor: 'rgba(74,144,217,0)',
       lineWidth: 2,
     });
-    s.setData(data.map(d => ({ time: d.time, value: d.close })));
+    as.setData(ohlc.map(d => ({ time: d.time, value: d.close })));
+  }
+
+  // MA20 overlay line
+  const ma20Data = calcMA20(history);
+  if (ma20Data.length) {
+    const maLine = chartInstance.addLineSeries({
+      color: '#f6c90e',
+      lineWidth: 1.5,
+      priceLineVisible: false,
+      lastValueVisible: true,
+      title: 'MA20',
+    });
+    maLine.setData(ma20Data);
   }
 
   chartInstance.timeScale().fitContent();
@@ -176,18 +216,13 @@ function renderChart(history) {
 }
 
 // ── Watchlist ──────────────────────────────────────────────
-function saveWatchlist() { localStorage.setItem('tw_watchlist', JSON.stringify(watchlist)); }
 const inWatchlist = code => watchlist.some(s => s.code === code);
 
 function updateWatchlistBtn() {
   const btn = document.getElementById('watchlist-btn');
-  if (currentStock && inWatchlist(currentStock.code)) {
-    btn.textContent = '★ 已加入自選';
-    btn.classList.add('active');
-  } else {
-    btn.textContent = '☆ 加入自選';
-    btn.classList.remove('active');
-  }
+  const active = currentStock && inWatchlist(currentStock.code);
+  btn.textContent = active ? '★ 已加入' : '☆ 自選股';
+  btn.classList.toggle('active', !!active);
 }
 
 function toggleWatchlist() {
@@ -205,7 +240,7 @@ function toggleWatchlist() {
 function renderWatchlist() {
   const el = document.getElementById('watchlist-list');
   if (!watchlist.length) {
-    el.innerHTML = '<p class="empty-hint">查詢股票後點「☆ 加入自選」即可儲存</p>';
+    el.innerHTML = '<p class="empty-hint">查詢股票後點「☆ 自選股」即可儲存</p>';
     return;
   }
 
@@ -234,10 +269,145 @@ function renderWatchlist() {
   );
 }
 
+// ── Alerts ─────────────────────────────────────────────────
+const hasAlert = code => alerts.some(a => a.code === code);
+
+function updateAlertBtn() {
+  const btn = document.getElementById('alert-btn');
+  const active = currentStock && hasAlert(currentStock.code);
+  btn.textContent = active ? '🔔 警報中' : '🔔 設定警報';
+  btn.classList.toggle('active', !!active);
+}
+
+function toggleAlert() {
+  if (!currentStock) return;
+
+  if (hasAlert(currentStock.code)) {
+    alerts = alerts.filter(a => a.code !== currentStock.code);
+  } else {
+    // Request browser notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    alerts.push({
+      ...currentStock,
+      prevAbove: null,  // unknown initial state
+      triggered: false,
+      lastPrice: null,
+      lastMa20: null,
+      addedAt: Date.now(),
+    });
+  }
+
+  saveAlerts();
+  updateAlertBtn();
+  renderAlerts();
+  updateAlertSection();
+}
+
+function renderAlerts() {
+  const el = document.getElementById('alert-list');
+  if (!alerts.length) {
+    el.innerHTML = '<p class="empty-hint">尚無警報</p>';
+    return;
+  }
+
+  el.innerHTML = alerts.map(a => {
+    const priceStr = a.lastPrice != null ? a.lastPrice.toFixed(2) : '--';
+    const ma20Str  = a.lastMa20  != null ? a.lastMa20.toFixed(2)  : '--';
+    let statusHtml = '<span class="alert-status pending">等待資料...</span>';
+    if (a.lastPrice != null && a.lastMa20 != null) {
+      const above = a.lastPrice > a.lastMa20;
+      statusHtml = above
+        ? '<span class="alert-status above">▲ 站上 MA20</span>'
+        : '<span class="alert-status below">▼ 低於 MA20</span>';
+    }
+    return `<div class="alert-item ${a.triggered ? 'triggered' : ''}">
+      <div class="alert-item-left">
+        <span class="ai-code">${a.code}</span>
+        <span class="ai-name">${a.name}</span>
+        <span class="wi-market ${a.market}">${a.market === 'tse' ? '上市' : '上櫃'}</span>
+      </div>
+      <div class="alert-item-right">
+        <span class="ai-price">現價 ${priceStr}</span>
+        <span class="ai-ma20">MA20 ${ma20Str}</span>
+        ${statusHtml}
+        <button class="ai-remove" data-code="${a.code}" title="移除警報">×</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.ai-remove').forEach(btn =>
+    btn.addEventListener('click', () => {
+      alerts = alerts.filter(a => a.code !== btn.dataset.code);
+      saveAlerts();
+      updateAlertBtn();
+      renderAlerts();
+      updateAlertSection();
+    })
+  );
+}
+
+function updateAlertSection() {
+  document.getElementById('alert-section').classList.toggle('hidden', alerts.length === 0);
+}
+
+// ── Alert polling ─────────────────────────────────────────
+async function checkAlerts() {
+  if (!alerts.length) return;
+
+  const statusEl = document.getElementById('alert-poll-status');
+  if (statusEl) statusEl.textContent = `檢查中... ${new Date().toLocaleTimeString('zh-TW')}`;
+
+  for (const alert of alerts) {
+    try {
+      const d = await fetch(`${API_BASE}/alert-check/${alert.code}?market=${alert.market}`).then(r => r.json());
+      if (d.error || d.above === null) continue;
+
+      const wasBelow = alert.prevAbove === false;
+      const nowAbove = d.above;
+
+      // Detect cross: was below, now above = 站上訊號
+      if (wasBelow && nowAbove && !alert.triggered) {
+        alert.triggered = true;
+        fireAlert(alert, d.price, d.ma20);
+      }
+      // Reset trigger state when price drops below again
+      if (!nowAbove) alert.triggered = false;
+
+      alert.prevAbove = nowAbove;
+      alert.lastPrice = d.price;
+      alert.lastMa20  = d.ma20;
+    } catch { /* skip on error */ }
+  }
+
+  saveAlerts();
+  renderAlerts();
+
+  if (statusEl) statusEl.textContent = `上次檢查：${new Date().toLocaleTimeString('zh-TW')}`;
+}
+
+function fireAlert(alert, price, ma20) {
+  const msg = `📢 ${alert.name} (${alert.code}) 站上 20 日均線！現價 ${price?.toFixed(2)}，MA20 = ${ma20?.toFixed(2)}`;
+
+  // Visual banner
+  const banner = document.getElementById('alert-banner');
+  banner.textContent = msg;
+  banner.classList.remove('hidden');
+  setTimeout(() => banner.classList.add('hidden'), 10000);
+
+  // Browser notification
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(`${alert.name} 站上 20 日均線 🔔`, {
+      body: `現價 ${price?.toFixed(2)}  ｜  MA20 ${ma20?.toFixed(2)}`,
+    });
+  }
+}
+
 // ── Ranking ────────────────────────────────────────────────
 async function loadRanking() {
   const el = document.getElementById('ranking-list');
-  el.innerHTML = '<div class="rank-loading">載入排行資料中（首次約需 10–20 秒）...</div>';
+  el.innerHTML = '<div class="rank-loading">載入排行資料中（首次約需 10 秒）...</div>';
 
   try {
     const data = await fetch(`${API_BASE}/ranking`).then(r => r.json());
@@ -299,17 +469,14 @@ document.addEventListener('click', e => {
 });
 
 document.getElementById('watchlist-btn').addEventListener('click', toggleWatchlist);
+document.getElementById('alert-btn').addEventListener('click', toggleAlert);
 
 document.querySelectorAll('.chart-toggle-btn').forEach(btn =>
   btn.addEventListener('click', () => {
     document.querySelectorAll('.chart-toggle-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     chartType = btn.dataset.type;
-    if (currentStock) {
-      fetch(`${API_BASE}/history/${currentStock.code}?market=${currentStock.market}`)
-        .then(r => r.json())
-        .then(d => { if (!d.error && d.history?.length) renderChart(d.history); });
-    }
+    if (currentHistory.length) renderChart(currentHistory);
   })
 );
 
@@ -333,8 +500,15 @@ document.querySelectorAll('.qp-btn').forEach(btn =>
 // ── Init ───────────────────────────────────────────────────
 loadIndex();
 renderWatchlist();
+renderAlerts();
+updateAlertSection();
 loadRanking();
+
 setInterval(() => {
   document.getElementById('market-time').textContent = new Date().toLocaleTimeString('zh-TW');
 }, 1000);
 setInterval(loadIndex, 60000);
+
+// Alert polling: every 30 seconds
+checkAlerts();
+setInterval(checkAlerts, 30000);

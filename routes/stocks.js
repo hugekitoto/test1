@@ -12,7 +12,7 @@ const ax = {
   headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StockDashboard/1.0)' },
 };
 
-// ── In-memory cache ────────────────────────────────────────
+// ── Cache ──────────────────────────────────────────────────
 const _cache = {};
 function getCache(key) {
   const e = _cache[key];
@@ -20,7 +20,7 @@ function getCache(key) {
 }
 function setCache(key, data) { _cache[key] = { data, ts: Date.now() }; }
 
-// ── Helpers ────────────────────────────────────────────────
+// ── Date helpers ───────────────────────────────────────────
 function twToISO(twDate) {
   const [y, m, d] = twDate.replace(/\//g, '-').split('-');
   return `${parseInt(y) + 1911}-${m}-${d}`;
@@ -31,28 +31,72 @@ function todayStr() {
   return `${n.getFullYear()}${String(n.getMonth() + 1).padStart(2, '0')}${String(n.getDate()).padStart(2, '0')}`;
 }
 
-function twYearMonth() {
-  const n = new Date();
-  return `${n.getFullYear() - 1911}/${String(n.getMonth() + 1).padStart(2, '0')}`;
+function prevMonthStr() {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}01`;
 }
 
-async function fetchTseList() {
-  const cached = getCache('tse_list');
-  if (cached) return cached;
-  const r = await axios.get(`${OPENAPI_BASE}/v1/exchangeReport/STOCK_DAY_ALL`, { ...ax, timeout: 20000 });
-  setCache('tse_list', r.data);
-  return r.data;
-}
-
-async function fetchOtcList() {
-  const cached = getCache('otc_list');
-  if (cached) return cached;
-  const r = await axios.get(`${TPEX_BASE}/openapi/v1/tpex_mainboard_daily_close_quotes`, { ...ax, timeout: 20000 });
-  setCache('otc_list', r.data);
-  return r.data;
+function dateToTwYM(yyyymm) {
+  const y = parseInt(yyyymm.slice(0, 4)) - 1911;
+  const m = yyyymm.slice(4, 6);
+  return `${y}/${m}`;
 }
 
 function num(s) { return parseFloat((s || '').toString().replace(/,/g, '')); }
+
+// ── Stock list fetchers (cached) ───────────────────────────
+async function fetchTseList() {
+  const c = getCache('tse_list'); if (c) return c;
+  const r = await axios.get(`${OPENAPI_BASE}/v1/exchangeReport/STOCK_DAY_ALL`, { ...ax, timeout: 20000 });
+  setCache('tse_list', r.data); return r.data;
+}
+
+async function fetchOtcList() {
+  const c = getCache('otc_list'); if (c) return c;
+  const r = await axios.get(`${TPEX_BASE}/openapi/v1/tpex_mainboard_daily_close_quotes`, { ...ax, timeout: 20000 });
+  setCache('otc_list', r.data); return r.data;
+}
+
+// ── Shared history fetcher ─────────────────────────────────
+async function fetchHistData(code, market, yyyymmdd) {
+  if (market === 'otc') {
+    const twYM = dateToTwYM(yyyymmdd);
+    const url = `${TPEX_BASE}/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=${twYM}&stkno=${code}&s=0,asc,0`;
+    const r = await axios.get(url, ax);
+    return (r.data?.aaData || []).map(row => ({
+      date: twToISO(row[0]),
+      volume: parseInt((row[1] || '0').replace(/,/g, '')),
+      open: num(row[3]), high: num(row[4]), low: num(row[5]), close: num(row[6]),
+    })).filter(d => !isNaN(d.close) && d.close > 0);
+  }
+
+  const url = `${TWSE_BASE}/rwd/zh/afterTrading/STOCK_DAY?stockNo=${code}&date=${yyyymmdd}&response=json`;
+  const r = await axios.get(url, ax);
+  if (r.data.stat !== 'OK' || !r.data.data) return [];
+  return r.data.data.map(row => ({
+    date: twToISO(row[0]),
+    volume: parseInt((row[1] || '0').replace(/,/g, '')),
+    open: num(row[3]), high: num(row[4]), low: num(row[5]), close: num(row[6]),
+  })).filter(d => !isNaN(d.close) && d.close > 0);
+}
+
+async function fetchTwoMonths(code, market) {
+  const [curr, prev] = await Promise.allSettled([
+    fetchHistData(code, market, todayStr()),
+    fetchHistData(code, market, prevMonthStr()),
+  ]);
+  const rows = [
+    ...(prev.status === 'fulfilled' ? prev.value : []),
+    ...(curr.status === 'fulfilled' ? curr.value : []),
+  ];
+  // Deduplicate and sort
+  const seen = new Set();
+  return rows
+    .filter(d => { if (seen.has(d.date)) return false; seen.add(d.date); return true; })
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
 
 // ── Quote (auto-detect TSE / OTC) ─────────────────────────
 router.get('/quote/:code', async (req, res) => {
@@ -79,50 +123,26 @@ router.get('/quote/:code', async (req, res) => {
     res.json({
       code: s.c, name: s.n, market,
       price, open: num(s.o), high: num(s.h), low: num(s.l), close: prev,
-      change: chg,
-      changePercent: ((chg / prev) * 100).toFixed(2),
-      volume: parseInt(s.v) || 0,
-      time: s.t, date: s.d,
+      change: chg, changePercent: ((chg / prev) * 100).toFixed(2),
+      volume: parseInt(s.v) || 0, time: s.t, date: s.d,
     });
   } catch (e) {
     res.status(500).json({ error: '無法取得即時報價', detail: e.message });
   }
 });
 
-// ── History (TSE or OTC) ──────────────────────────────────
+// ── History (supports ?months=1|2) ────────────────────────
 router.get('/history/:code', async (req, res) => {
   const { code } = req.params;
   const market = req.query.market || 'tse';
+  const months = parseInt(req.query.months) || 1;
 
   try {
-    if (market === 'otc') {
-      const url = `${TPEX_BASE}/web/stock/aftertrading/daily_trading_info/st43_result.php` +
-        `?l=zh-tw&d=${twYearMonth()}&stkno=${code}&s=0,asc,0`;
-      const r = await axios.get(url, ax);
-      const rows = r.data?.aaData || [];
-      if (!rows.length) return res.status(404).json({ error: '無歷史資料' });
+    const history = months >= 2
+      ? await fetchTwoMonths(code, market)
+      : await fetchHistData(code, market, todayStr());
 
-      const history = rows.map(row => ({
-        date: twToISO(row[0]),
-        volume: parseInt((row[1] || '0').replace(/,/g, '')),
-        open: num(row[3]), high: num(row[4]), low: num(row[5]), close: num(row[6]),
-      })).filter(r => !isNaN(r.close) && r.close > 0);
-
-      return res.json({ code, history });
-    }
-
-    // TSE
-    const url = `${TWSE_BASE}/rwd/zh/afterTrading/STOCK_DAY?stockNo=${code}&date=${todayStr()}&response=json`;
-    const r = await axios.get(url, ax);
-    const data = r.data;
-    if (data.stat !== 'OK' || !data.data) return res.status(404).json({ error: '無歷史資料' });
-
-    const history = data.data.map(row => ({
-      date: twToISO(row[0]),
-      volume: parseInt((row[1] || '0').replace(/,/g, '')),
-      open: num(row[3]), high: num(row[4]), low: num(row[5]), close: num(row[6]),
-    })).filter(r => !isNaN(r.close) && r.close > 0);
-
+    if (!history.length) return res.status(404).json({ error: '無歷史資料' });
     res.json({ code, history });
   } catch (e) {
     res.status(500).json({ error: '無法取得歷史資料', detail: e.message });
@@ -142,8 +162,7 @@ router.get('/index', async (req, res) => {
 
     res.json({
       name: idx.n, price, close: prev,
-      change: chg.toFixed(2),
-      changePercent: ((chg / prev) * 100).toFixed(2),
+      change: chg.toFixed(2), changePercent: ((chg / prev) * 100).toFixed(2),
       volume: idx.v, time: idx.t,
     });
   } catch (e) {
@@ -190,7 +209,7 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// ── Ranking (top gainers / losers) ────────────────────────
+// ── Ranking ───────────────────────────────────────────────
 router.get('/ranking', async (req, res) => {
   try {
     const [tse, otc] = await Promise.allSettled([fetchTseList(), fetchOtcList()]);
@@ -203,8 +222,7 @@ router.get('/ranking', async (req, res) => {
         if (!isNaN(close) && close > 0 && !isNaN(change)) {
           const prev = close - change;
           stocks.push({
-            code: s.Code, name: s.Name, market: 'tse',
-            close, change,
+            code: s.Code, name: s.Name, market: 'tse', close, change,
             changePercent: prev > 0 ? +((change / prev) * 100).toFixed(2) : 0,
           });
         }
@@ -220,8 +238,7 @@ router.get('/ranking', async (req, res) => {
         if (code && !isNaN(close) && close > 0 && !isNaN(change)) {
           const prev = close - change;
           stocks.push({
-            code, name, market: 'otc',
-            close, change,
+            code, name, market: 'otc', close, change,
             changePercent: prev > 0 ? +((change / prev) * 100).toFixed(2) : 0,
           });
         }
@@ -229,13 +246,55 @@ router.get('/ranking', async (req, res) => {
     }
 
     const sorted = [...stocks].sort((a, b) => b.changePercent - a.changePercent);
-
     res.json({
       gainers: sorted.slice(0, 10),
       losers: sorted.slice(-10).reverse(),
     });
   } catch (e) {
     res.status(500).json({ error: '無法取得排行資料', detail: e.message });
+  }
+});
+
+// ── Alert Check ───────────────────────────────────────────
+// GET /api/stocks/alert-check/:code?market=tse|otc
+// Returns: { code, price, ma20, above }
+router.get('/alert-check/:code', async (req, res) => {
+  const { code } = req.params;
+  const market = req.query.market || 'tse';
+
+  try {
+    const [histResult, quoteResult] = await Promise.allSettled([
+      fetchTwoMonths(code, market),
+      (async () => {
+        const r = await axios.get(
+          `${MIS_BASE}/stock/api/getStockInfo.jsp?ex_ch=${market}_${code}.tw&json=1&delay=0`, ax
+        );
+        const s = r.data?.msgArray?.[0];
+        if (!s) throw new Error('no data');
+        return parseFloat(s.z) || parseFloat(s.y);
+      })(),
+    ]);
+
+    if (quoteResult.status !== 'fulfilled') {
+      return res.status(500).json({ error: '無法取得即時報價' });
+    }
+
+    const price = quoteResult.value;
+    let ma20 = null;
+
+    if (histResult.status === 'fulfilled' && histResult.value.length >= 20) {
+      const last20 = histResult.value.slice(-20);
+      ma20 = parseFloat((last20.reduce((s, d) => s + d.close, 0) / 20).toFixed(2));
+    }
+
+    res.json({
+      code,
+      price,
+      ma20,
+      above: ma20 !== null ? price > ma20 : null,
+    });
+  } catch (e) {
+    res.status(500).json({ error: '警報檢查失敗', detail: e.message });
   }
 });
 

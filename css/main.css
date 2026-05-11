@@ -19,8 +19,28 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .hidden { display: none !important; }
-.up { color: #fc8181; }
+.up   { color: #fc8181; }
 .down { color: #68d391; }
+
+/* ── Alert Banner ────────────────────────────────────────── */
+.alert-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 9999;
+  background: #744210;
+  border-bottom: 2px solid #f6c90e;
+  color: #fef08a;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 14px 24px;
+  text-align: center;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
 
 /* ── Navbar ─────────────────────────────────────────────── */
 .navbar {
@@ -38,11 +58,7 @@ button { font-family: inherit; cursor: pointer; }
   justify-content: space-between;
 }
 
-.navbar-brand {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: #e2e8f0;
-}
+.navbar-brand { font-size: 1.2rem; font-weight: 700; }
 
 .market-time {
   font-size: 0.82rem;
@@ -50,7 +66,7 @@ button { font-family: inherit; cursor: pointer; }
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Main layout ────────────────────────────────────────── */
+/* ── Main layout ─────────────────────────────────────────── */
 .main-content {
   padding: 20px 16px 56px;
   display: flex;
@@ -58,7 +74,7 @@ button { font-family: inherit; cursor: pointer; }
   gap: 20px;
 }
 
-/* ── Index card ─────────────────────────────────────────── */
+/* ── Index card ──────────────────────────────────────────── */
 .index-section { display: flex; }
 
 .index-card {
@@ -68,18 +84,17 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 12px;
   padding: 18px 28px;
   min-width: 260px;
-  transition: border-color 0.2s;
 }
 
-.index-card.up { border-left-color: #e53e3e; }
+.index-card.up   { border-left-color: #e53e3e; }
 .index-card.down { border-left-color: #38a169; }
 
-.index-label { font-size: 0.78rem; color: #718096; margin-bottom: 6px; letter-spacing: 0.05em; }
-.index-price { font-size: 2rem; font-weight: 700; margin-bottom: 4px; }
+.index-label  { font-size: 0.78rem; color: #718096; margin-bottom: 6px; letter-spacing: 0.05em; }
+.index-price  { font-size: 2rem; font-weight: 700; margin-bottom: 4px; }
 .index-change { font-size: 1rem; font-weight: 600; }
-.index-meta { font-size: 0.75rem; color: #718096; margin-top: 6px; }
+.index-meta   { font-size: 0.75rem; color: #718096; margin-top: 6px; }
 
-/* ── Search ─────────────────────────────────────────────── */
+/* ── Search ──────────────────────────────────────────────── */
 .search-section { position: relative; }
 
 .search-bar { display: flex; gap: 10px; }
@@ -96,7 +111,7 @@ button { font-family: inherit; cursor: pointer; }
   transition: border-color 0.2s;
 }
 
-.search-input:focus { border-color: #4a90d9; }
+.search-input:focus    { border-color: #4a90d9; }
 .search-input::placeholder { color: #4a5568; }
 
 .search-btn {
@@ -135,13 +150,12 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .search-item:hover { background: #2d3748; }
-.si-code { font-weight: 700; color: #4a90d9; min-width: 50px; }
-.si-name { flex: 1; }
+.si-code  { font-weight: 700; color: #4a90d9; min-width: 50px; }
+.si-name  { flex: 1; }
 .si-price { font-size: 0.85rem; color: #718096; }
-
 .search-loading, .search-empty { padding: 14px; color: #718096; text-align: center; }
 
-/* ── Badges ─────────────────────────────────────────────── */
+/* ── Badges ──────────────────────────────────────────────── */
 .badge {
   display: inline-block;
   border-radius: 5px;
@@ -151,11 +165,21 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .badge-code { background: #2d3748; color: #a0aec0; }
-.badge-market, .si-market, .wi-market, .badge-market { border-radius: 5px; padding: 2px 8px; font-size: 0.72rem; font-weight: 600; }
+
+.badge-market,
+.si-market,
+.wi-market {
+  display: inline-block;
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
 .badge-market.tse, .si-market.tse, .wi-market.tse { background: rgba(74,144,217,0.15); color: #4a90d9; }
 .badge-market.otc, .si-market.otc, .wi-market.otc { background: rgba(154,102,217,0.15); color: #b794f4; }
 
-/* ── Stock section ──────────────────────────────────────── */
+/* ── Stock section ───────────────────────────────────────── */
 .stock-section {
   background: #1a1d27;
   border: 1px solid #2d3748;
@@ -175,29 +199,30 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .stock-badges { display: flex; gap: 8px; margin-top: 6px; align-items: center; }
-
-.stock-name { font-size: 1.45rem; font-weight: 700; }
+.stock-name   { font-size: 1.45rem; font-weight: 700; }
 
 .stock-header-right { text-align: right; }
 
-.stock-price { font-size: 2.4rem; font-weight: 700; line-height: 1.1; }
+.stock-price  { font-size: 2.4rem; font-weight: 700; line-height: 1.1; }
 .stock-change { font-size: 1rem; font-weight: 600; margin-top: 4px; }
 
-.watchlist-toggle-btn {
-  margin-top: 10px;
+/* Action buttons (自選股 + 警報) */
+.action-btns { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+
+.action-btn {
   background: transparent;
   border: 1px solid #4a5568;
   border-radius: 6px;
   color: #a0aec0;
   padding: 6px 14px;
   font-size: 0.85rem;
-  transition: border-color 0.2s, color 0.2s;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
 }
 
-.watchlist-toggle-btn:hover { border-color: #f6c90e; color: #f6c90e; }
-.watchlist-toggle-btn.active { border-color: #f6c90e; color: #f6c90e; }
+.action-btn:hover { border-color: #e2e8f0; color: #e2e8f0; }
+.action-btn.active { border-color: #f6c90e; color: #f6c90e; }
 
-/* ── Metrics grid ───────────────────────────────────────── */
+/* ── Metrics grid ────────────────────────────────────────── */
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -211,10 +236,12 @@ button { font-family: inherit; cursor: pointer; }
   padding: 12px 14px;
 }
 
+.ma20-metric { border-color: #4a4010; }
+
 .metric-label { font-size: 0.73rem; color: #718096; margin-bottom: 5px; }
 .metric-value { font-size: 1.05rem; font-weight: 600; }
 
-/* ── Chart ──────────────────────────────────────────────── */
+/* ── Chart ───────────────────────────────────────────────── */
 .chart-section {
   background: #0f1117;
   border: 1px solid #2d3748;
@@ -225,14 +252,33 @@ button { font-family: inherit; cursor: pointer; }
 .chart-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
+  gap: 12px;
+  padding: 10px 14px;
   border-bottom: 1px solid #1e2230;
 }
 
-.chart-label { font-size: 0.8rem; color: #718096; font-weight: 600; letter-spacing: 0.05em; }
+.chart-label { font-size: 0.8rem; color: #718096; font-weight: 600; }
 
-.chart-toggle { display: flex; gap: 4px; }
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #718096;
+  flex: 1;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  background: #e53e3e;
+}
+
+.ma-dot { background: #f6c90e; }
+
+.chart-toggle { display: flex; gap: 4px; margin-left: auto; }
 
 .chart-toggle-btn {
   background: transparent;
@@ -249,14 +295,79 @@ button { font-family: inherit; cursor: pointer; }
 
 .price-chart { width: 100%; }
 
-/* ── Two-column layout ──────────────────────────────────── */
+/* ── Alert section ───────────────────────────────────────── */
+.alert-section {
+  background: #1a1d27;
+  border: 1px solid #3d3010;
+  border-left: 4px solid #f6c90e;
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.alert-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.poll-status { font-size: 0.78rem; color: #718096; }
+
+.alert-list { display: flex; flex-direction: column; gap: 8px; }
+
+.alert-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #0f1117;
+  border: 1px solid #2d3748;
+  border-radius: 8px;
+  padding: 12px 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+  transition: border-color 0.3s;
+}
+
+.alert-item.triggered { border-color: #f6c90e; box-shadow: 0 0 8px rgba(246,201,14,0.2); }
+
+.alert-item-left  { display: flex; align-items: center; gap: 10px; }
+.alert-item-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.ai-code  { font-weight: 700; color: #4a90d9; }
+.ai-name  { color: #e2e8f0; }
+.ai-price { font-size: 0.85rem; color: #a0aec0; }
+.ai-ma20  { font-size: 0.85rem; color: #f6c90e; }
+
+.alert-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 5px;
+}
+
+.alert-status.above   { background: rgba(229,62,62,0.15); color: #fc8181; }
+.alert-status.below   { background: rgba(56,161,105,0.15); color: #68d391; }
+.alert-status.pending { background: #2d3748; color: #718096; }
+
+.ai-remove {
+  background: transparent;
+  border: none;
+  color: #4a5568;
+  font-size: 1.1rem;
+  padding: 0 4px;
+  transition: color 0.15s;
+}
+
+.ai-remove:hover { color: #fc8181; }
+
+/* ── Two-column layout ───────────────────────────────────── */
 .two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
 
-/* ── Watchlist section ──────────────────────────────────── */
+/* ── Watchlist section ───────────────────────────────────── */
 .watchlist-section, .quickpick-section {
   background: #1a1d27;
   border: 1px solid #2d3748;
@@ -278,7 +389,6 @@ button { font-family: inherit; cursor: pointer; }
 .wi {
   display: flex;
   align-items: center;
-  gap: 8px;
   background: #0f1117;
   border: 1px solid #2d3748;
   border-radius: 8px;
@@ -297,7 +407,7 @@ button { font-family: inherit; cursor: pointer; }
   cursor: pointer;
 }
 
-.wi-code { font-weight: 700; color: #4a90d9; font-size: 0.9rem; min-width: 40px; }
+.wi-code { font-weight: 700; color: #4a90d9; min-width: 40px; font-size: 0.9rem; }
 .wi-name { flex: 1; font-size: 0.9rem; }
 
 .wi-remove {
@@ -306,7 +416,6 @@ button { font-family: inherit; cursor: pointer; }
   color: #4a5568;
   padding: 10px 14px;
   font-size: 1.1rem;
-  line-height: 1;
   transition: color 0.15s;
 }
 
@@ -314,7 +423,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .empty-hint { font-size: 0.82rem; color: #4a5568; text-align: center; padding: 16px 0; }
 
-/* ── Quick-pick ─────────────────────────────────────────── */
+/* ── Quick-pick ──────────────────────────────────────────── */
 .quickpick-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .qp-btn {
@@ -329,7 +438,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .qp-btn:hover { border-color: #4a90d9; color: #e2e8f0; }
 
-/* ── Ranking section ────────────────────────────────────── */
+/* ── Ranking section ─────────────────────────────────────── */
 .ranking-section {
   background: #1a1d27;
   border: 1px solid #2d3748;
@@ -371,24 +480,17 @@ button { font-family: inherit; cursor: pointer; }
 
 .rank-loading { padding: 24px; text-align: center; color: #4a5568; font-size: 0.88rem; }
 
-.rank-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.88rem;
-}
-
+.rank-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 .rank-table thead tr { border-bottom: 1px solid #2d3748; }
 .rank-table th { padding: 8px 12px; color: #718096; font-weight: 600; text-align: left; white-space: nowrap; }
 .rank-table td { padding: 10px 12px; border-bottom: 1px solid #1e2230; white-space: nowrap; }
-
 .rank-row { cursor: pointer; transition: background 0.15s; }
 .rank-row:hover { background: #1e2230; }
 .rank-row:last-child td { border-bottom: none; }
-
-.rank-num { color: #4a5568; font-size: 0.8rem; }
+.rank-num  { color: #4a5568; font-size: 0.8rem; }
 .rank-code { font-weight: 700; color: #4a90d9; }
 
-/* ── Footer ─────────────────────────────────────────────── */
+/* ── Footer ──────────────────────────────────────────────── */
 .footer {
   background: #1a1d27;
   border-top: 1px solid #2d3748;
@@ -398,12 +500,14 @@ button { font-family: inherit; cursor: pointer; }
 
 .footer p { font-size: 0.78rem; color: #4a5568; }
 
-/* ── Responsive ─────────────────────────────────────────── */
+/* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 700px) {
   .two-col { grid-template-columns: 1fr; }
   .stock-header { flex-direction: column; }
   .stock-header-right { text-align: left; }
+  .action-btns { justify-content: flex-start; }
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
   .index-card { min-width: 0; width: 100%; }
   .rank-table { font-size: 0.8rem; }
+  .alert-item { flex-direction: column; align-items: flex-start; }
 }
