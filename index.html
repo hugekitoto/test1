@@ -1,64 +1,151 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-TW">
 <head>
-	<meta charset="UTF-8">
-	<title>CSS DEMO</title>
-	<link rel="stylesheet" href="css/reset.css">
-	<link rel="stylesheet" href="css/main.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台股儀表板</title>
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-default navbar-fixed-top">
-        <div class="container">
-            <!-- Brand and toggle get grouped for better mobile display -->
-            <div class="navbar-header">
-                <a class="navbar-brand" href="#page-top">Anna Studio</a>
-            </div>
-            <!-- Collect the nav links, forms, and other content for toggling -->
-            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-                <ul class="nav navbar-nav navbar-right">
-                    <li><a href=""></a></li>
-                    <li class=""><a href="">Services</a></li>
-                    <li><a href="">Portfolio</a></li>
-                    <li><a href="">About</a></li>
-                    <li><a href="">Team</a></li>
-                    <li><a href="">Contact</a></li>
-                </ul>
-            </div>
-            <!-- /.navbar-collapse -->
-        </div>
-        <!-- /.container-fluid -->
-    </nav>
 
-    <!-- Header -->
-    <header>
-        <div class="container">
-            <div class="intro-text">
-                <div class="intro-lead-in">Welcome To Anna Studio.</div>
-                <div class="intro-heading">It's Nice To Meet You.</div>
-                <a class="btn-more">More</a>
-            </div>
-        </div>
-    </header>
+  <!-- 警報觸發 Banner -->
+  <div id="alert-banner" class="alert-banner hidden"></div>
 
-    <footer>
-        <div class="container">
-            <div>
-                <div>
-                    <span class="copyright">Copyright © Your Website 2014</span>
-                </div>
-                <div>
-                    <ul class="footer-contact">
-                        <li><a href="#">facebook</a></li>
-                        <li><a href="#">Google +</a></li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </footer>
+  <nav class="navbar">
+    <div class="container nav-inner">
+      <div class="navbar-brand">📈 台股儀表板</div>
+      <span id="market-time" class="market-time">--</span>
+    </div>
+  </nav>
 
-</body>
-<body>
-	
+  <main class="container main-content">
+
+    <!-- 大盤指數 -->
+    <section class="index-section">
+      <div class="index-card" id="taiex-card">
+        <div class="index-label">加權指數 TAIEX</div>
+        <div class="index-price" id="taiex-price">--</div>
+        <div class="index-change" id="taiex-change">--</div>
+        <div class="index-meta" id="taiex-meta">載入中...</div>
+      </div>
+    </section>
+
+    <!-- 搜尋 -->
+    <section class="search-section">
+      <div class="search-bar">
+        <input type="text" id="search-input" class="search-input"
+          placeholder="輸入股票代號或名稱（上市/上櫃均可）" autocomplete="off">
+        <button id="search-btn" class="search-btn">查詢</button>
+      </div>
+      <div id="search-results" class="search-results hidden"></div>
+    </section>
+
+    <!-- 股票資訊卡 -->
+    <section id="stock-section" class="stock-section hidden">
+      <div class="stock-header">
+        <div class="stock-header-left">
+          <h2 id="stock-name" class="stock-name">--</h2>
+          <div class="stock-badges">
+            <span id="stock-code-badge" class="badge badge-code">--</span>
+            <span id="stock-market-badge" class="badge badge-market">--</span>
+          </div>
+        </div>
+        <div class="stock-header-right">
+          <div id="stock-price" class="stock-price">--</div>
+          <div id="stock-change" class="stock-change">--</div>
+          <div class="action-btns">
+            <button id="watchlist-btn" class="action-btn">☆ 自選股</button>
+            <button id="alert-btn" class="action-btn">🔔 設定警報</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="metric-card"><div class="metric-label">開盤</div><div id="m-open" class="metric-value">--</div></div>
+        <div class="metric-card"><div class="metric-label">最高</div><div id="m-high" class="metric-value">--</div></div>
+        <div class="metric-card"><div class="metric-label">最低</div><div id="m-low" class="metric-value">--</div></div>
+        <div class="metric-card"><div class="metric-label">昨收</div><div id="m-close" class="metric-value">--</div></div>
+        <div class="metric-card"><div class="metric-label">成交張數</div><div id="m-volume" class="metric-value">--</div></div>
+        <div class="metric-card ma20-metric">
+          <div class="metric-label">20 日均線</div>
+          <div id="m-ma20" class="metric-value">--</div>
+        </div>
+      </div>
+
+      <div class="chart-section">
+        <div class="chart-toolbar">
+          <span class="chart-label">近 2 月走勢</span>
+          <div class="chart-legend">
+            <span class="legend-dot" style="background:#fc8181;"></span>K線
+            <span class="legend-dot ma-dot"></span>MA20
+          </div>
+          <div class="chart-toggle">
+            <button class="chart-toggle-btn active" data-type="candlestick">K線</button>
+            <button class="chart-toggle-btn" data-type="area">折線</button>
+          </div>
+        </div>
+        <div id="price-chart" class="price-chart"></div>
+      </div>
+    </section>
+
+    <!-- 警報管理 -->
+    <section id="alert-section" class="alert-section hidden">
+      <div class="alert-section-header">
+        <h3 class="section-title">🔔 MA20 警報監控</h3>
+        <span id="alert-poll-status" class="poll-status">監控中...</span>
+      </div>
+      <div id="alert-list" class="alert-list"></div>
+    </section>
+
+    <!-- 自選股 + 熱門股票 -->
+    <div class="two-col">
+      <section class="watchlist-section">
+        <h3 class="section-title">⭐ 自選股清單</h3>
+        <div id="watchlist-list" class="watchlist-list">
+          <p class="empty-hint">查詢股票後點「☆ 自選股」即可儲存</p>
+        </div>
+      </section>
+
+      <section class="quickpick-section">
+        <h3 class="section-title">🔥 熱門股票</h3>
+        <div class="quickpick-grid">
+          <button class="qp-btn" data-code="2330">2330 台積電</button>
+          <button class="qp-btn" data-code="2317">2317 鴻海</button>
+          <button class="qp-btn" data-code="2454">2454 聯發科</button>
+          <button class="qp-btn" data-code="2882">2882 國泰金</button>
+          <button class="qp-btn" data-code="2412">2412 中華電</button>
+          <button class="qp-btn" data-code="2308">2308 台達電</button>
+          <button class="qp-btn" data-code="6488">6488 環球晶 (櫃)</button>
+          <button class="qp-btn" data-code="3443">3443 創意電子 (櫃)</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 排行榜 -->
+    <section class="ranking-section">
+      <div class="ranking-header">
+        <h3 class="section-title">📊 漲跌幅排行</h3>
+        <button id="ranking-refresh" class="refresh-btn">↻ 重新載入</button>
+      </div>
+      <div class="ranking-tabs">
+        <button class="rtab active" data-tab="gainers">漲幅 TOP 10</button>
+        <button class="rtab" data-tab="losers">跌幅 TOP 10</button>
+      </div>
+      <div id="ranking-list" class="ranking-list">
+        <div class="rank-loading">載入排行資料中（首次約需 10 秒）...</div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>資料來源：台灣證券交易所 (TWSE) ｜ 延遲約 15 分鐘 ｜ 警報每 30 秒檢查一次 ｜ 僅供參考，不構成投資建議</p>
+    </div>
+  </footer>
+
+  <script src="js/app.js"></script>
 </body>
 </html>
