@@ -58,7 +58,19 @@ data (OHLCV) ─▶ features (volatility) ─▶ phases ─▶ cycles ─▶ rep
 
 ---
 
-## Quick start
+## Run from a phone (iPhone/iPad) — Google Colab
+
+No local install needed. Open [colab.research.google.com](https://colab.research.google.com)
+in Safari, then **File → Open notebook → GitHub**, paste this repo, and open
+`volatility-engine/notebooks/VE_Colab.ipynb`. Run the cells top-to-bottom — it
+clones the repo, fetches **real Taiwan ETF/stock data** (Colab has internet),
+runs the full VE pipeline, and shows the charts inline on your phone.
+
+Direct Colab link (fill the repo/branch in Colab's GitHub tab if the repo is
+private, or set a token in the first cell):
+`github.com/hugekitoto/test1` → `volatility-engine/notebooks/VE_Colab.ipynb`
+
+## Quick start (desktop)
 
 ```bash
 cd volatility-engine
