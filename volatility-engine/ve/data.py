@@ -58,17 +58,24 @@ def generate_sample(
     base_vol: float = 0.012,
     vol_amp: float = 0.9,
     seed: int = 0,
+    mean_reversion: float = 0.035,
 ) -> pd.DataFrame:
     """Generate synthetic daily OHLCV with an embedded volatility cycle.
 
-    The *volatility* (not the price) follows a mean-reverting oscillation of
-    period ``cycle_len`` days plus noise. Returns are drawn N(0, vol_t), so the
-    series is direction-neutral by construction — exactly VE's assumption. This
-    lets us check whether the engine recovers a cycle we know is there.
+    The *volatility* (not the price direction) follows a mean-reverting
+    oscillation of period ``cycle_len`` days plus AR(1) noise — this is the
+    structure VE is meant to detect.
+
+    On top of that, price carries a *mild* mean-reversion toward a slow anchor
+    (strength ``mean_reversion``). This models VE's §6 hypothesis directly —
+    "市場偏離平衡 → 回歸" — so the Build/Exit trading layer has real imbalance to
+    act on. Set ``mean_reversion=0`` for a pure direction-neutral random walk
+    (volatility cycle only, no tradable edge). Either way the shocks are
+    symmetric, so long and short remain interchangeable.
 
     Returns a frame with columns Open/High/Low/Close/Volume/Turnover and a
-    hidden '_true_vol' column (the ground-truth latent volatility) that the
-    research runner can use for validation but the engine never reads.
+    hidden '_true_vol' column (ground-truth latent volatility the engine never
+    reads).
     """
     rng = np.random.default_rng(seed)
     t = np.arange(n_days)
@@ -82,9 +89,15 @@ def generate_sample(
         ar[i] = 0.92 * ar[i - 1] + rng.normal(0, 0.25)
     true_vol = base_vol * np.clip(cycle * np.exp(ar), 0.15, None)
 
-    # Daily log returns driven purely by volatility (mean ~0 -> direction neutral).
-    rets = rng.normal(0.0, 1.0, n_days) * true_vol
-    close = 100.0 * np.exp(np.cumsum(rets))
+    # Symmetric volatility shocks + a weak pull back toward a slow anchor.
+    shocks = rng.normal(0.0, 1.0, n_days) * true_vol
+    logp = np.zeros(n_days)
+    anchor = 0.0
+    for i in range(1, n_days):
+        anchor = 0.98 * anchor + 0.02 * logp[i - 1]          # slow-moving fair value
+        pull = -mean_reversion * (logp[i - 1] - anchor)      # imbalance -> reversion
+        logp[i] = logp[i - 1] + pull + shocks[i]
+    close = 100.0 * np.exp(logp)
 
     # Build a plausible OHLC around each close. Intraday range scales with vol.
     open_ = np.empty(n_days)

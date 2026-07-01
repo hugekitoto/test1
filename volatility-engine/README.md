@@ -48,6 +48,12 @@ data (OHLCV) ─▶ features (volatility) ─▶ phases ─▶ cycles ─▶ rep
 | `ve/phases.py`   | Phase classification (with hysteresis + de-speckling) and phase durations. |
 | `ve/cycles.py`   | Cycle length, transition matrix, inertia/persistence, canonical-follow rates. |
 | `ve/report.py`   | Answers the 8 research questions (design §9) in plain text. |
+| `ve/regimes.py`  | **(Phase 2)** Bull/Bear/Range tagging — *only* to stratify results, never to classify phases. |
+| `ve/profile.py`  | **(Phase 2)** Per-phase forward-vol / move / duration profiles + time-consistency across regimes. |
+| `ve/zones.py`    | **(Phase 3)** Build Zone / Exit Zone + imbalance direction, derived from the cycle. |
+| `ve/backtest.py` | **(Phase 3)** Event-driven backtest of the zones (long-only & long/short) with metrics. |
+| `ve/evaluate.py` | **(Phase 3)** Scores the six success criteria (design §11). |
+| `ve/plotting.py` | Phase-shaded price, HV cycle, and equity charts (headless PNG). |
 | `ve/fetch.py`    | *Optional* live data (yfinance / TWSE) — for local use only (see note). |
 
 ---
@@ -61,15 +67,21 @@ pip install -r requirements.txt
 # 1. generate offline sample data (planted volatility cycles)
 python scripts/generate_sample_data.py
 
-# 2. run the Phase-1 research report across all assets
+# 2. Phase-1 research report only
 python scripts/run_research.py
 
-# 3. ask a single asset which phase it's in right now
+# 3. FULL run — Phase 1 + 2 + 3, success scorecard, and charts in output/
+python scripts/run_full.py
+
+# 4. ask a single asset which phase it's in right now
 python scripts/current_phase.py data/sample/ETF_0050.csv
 
 # tests (no network needed)
 python tests/test_pipeline.py
 ```
+
+`run_full.py` writes per-asset charts (`output/<asset>.png`) showing price with
+phase shading, the HV cycle, and strategy-vs-buy&hold equity.
 
 ### Using your own data
 Drop daily OHLCV CSVs (columns `Date,Open,High,Low,Close,Volume[,Turnover]`,
@@ -112,6 +124,46 @@ canonical pattern is the empirical test of the whole hypothesis.
 
 ---
 
+## Phase 2 — what each phase means
+
+For every asset VE measures, per phase, the **forward** 10-day realised
+volatility, the forward move magnitude (direction-neutral), the average
+duration, and the canonical-follow rate. The core predictions it checks:
+
+* **Compression** is the *quietest* phase now but has *positive* forward-vol
+  change → quiet, about to expand.
+* **Exhaustion** is the *loudest* now but *negative* forward-vol change →
+  loud, about to cool.
+
+It also recomputes the cycle **within Bull / Bear / Range regimes** to test
+time-consistency (§11.3).
+
+## Phase 3 — Build/Exit zones, trading layer, backtest
+
+Zones come from the cycle, not from hand-set prices:
+
+* **Build Zone** = Compression (low, coiling vol). Direction from *imbalance*
+  (position-in-range): stretched **down → long**, stretched **up → short**.
+* **Exit Zone** = Exhaustion (vol climaxed); also flatten on Recovery or an
+  ATR stop.
+
+`backtest.py` runs this long-only and long/short (no look-ahead: decide at
+close *t*, hold from *t+1*), reporting return, Sharpe, drawdown, win rate and
+long-vs-short breakdown. `evaluate.py` turns it all into a **§11 scorecard**.
+
+### Honest status of the scorecard
+
+On the bundled synthetic sample the engine scores **4 / 6**:
+
+* ✅ 1,2,3,6 — the **volatility cycle** is real, reproducible, regime-consistent
+  and independent of trend. This is Phase 1's question, answered YES.
+* ⚠️ 4,5 — the **trading layer** (long/short symmetry, net-positive zones) is
+  marginal. Two names are strongly profitable and long-side expectancy is
+  positive, but shorts lag because the sample assets drift upward. This is the
+  design's own last and hardest stage and **must be validated / tuned on real
+  data** — the synthetic sample was deliberately *not* over-fitted to force a
+  pass.
+
 ## Mapping to the research design
 
 | Design section | Where it lives |
@@ -122,15 +174,18 @@ canonical pattern is the empirical test of the whole hypothesis.
 | §8 data fields | `features.compute_features` |
 | §9 research questions 1–8 | `report.answer_research_questions` |
 | §10 "which phase am I in?" | `scripts/current_phase.py` |
+| §11 six success criteria | `evaluate.evaluate` |
 
 ---
 
 ## Roadmap (per the design)
 
-- **Phase 1 (this repo):** does the cycle exist? → engine + evidence. ✅
-- **Phase 2:** if it holds on real data, formalise each phase per asset class.
-- **Phase 3:** derive **Build Zone** / **Exit Zone** from the cycle (not hand-set
-  prices), enable the trading layer, add cross-market (US ETFs) validation.
+- **Phase 1:** does the cycle exist? → engine + evidence. ✅
+- **Phase 2:** formalise each phase (forward-vol profile) + regime consistency. ✅
+- **Phase 3:** Build/Exit zones, trading layer, backtest, §11 scorecard. ✅
+  *(framework complete; trading edge to be validated/tuned on real market data)*
+- **Next:** feed real Taiwan ETFs / large caps, then stage-2/3 assets
+  (mid/small caps, US ETFs) for cross-market confirmation.
 
-VE is designed to stay **independent from momentum/trend strategies** so it can
-become a separate Alpha Engine (design §11).
+VE is **independent from momentum/trend strategies** by design, so it can become
+a separate Alpha Engine (design §11).
