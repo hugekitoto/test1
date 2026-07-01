@@ -150,7 +150,38 @@ duration, and the canonical-follow rate. The core predictions it checks:
 It also recomputes the cycle **within Bull / Bear / Range regimes** to test
 time-consistency (§11.3).
 
-## Phase 3 — Build/Exit zones, trading layer, backtest
+## v0.2 — Phase ≠ Trade: the Transition model
+
+Real-data results taught the key lesson: **identifying a phase is not a trade
+signal** ("knowing it's winter doesn't mean ski today"). The naive Build/Exit
+rules lost on real Taiwan data because they fought a decade-long uptrend.
+
+So v0.2 shifts the question from *"which phase are we in?"* to
+***"when does it transition to the next phase?"*** — and enforces a highest
+principle: **only design trading rules once the model can predict the next
+phase out-of-sample.**
+
+`ve/transitions.py` (+ `scripts/run_transition_study.py`) delivers:
+
+* **Hazard curve** — P(phase ends on day *d* | it reached day *d*). Answers
+  *when* transitions cluster (a time-based Trigger).
+* **Transition model** — logistic regression (pure numpy, no sklearn) predicting
+  `P(current phase ends within N days)` from volatility+time features only.
+* **Triggers** — the standardised coefficients rank which features drive each
+  transition (e.g. Compression→Expansion driven by rising HV momentum).
+* **Honest verdict** — strict time split (70% train / 30% test), reports
+  out-of-sample **AUC** per transition vs the base rate. `0.50` = coin-flip;
+  `>0.60` = usable. The trading layer is unlocked **only** if the model predicts.
+
+```bash
+python scripts/run_transition_study.py --data data/real --horizon 5
+```
+
+The older Build/Exit backtest below is retained as the v0.1 baseline that
+motivated this pivot — it is **not** the recommended path until transitions
+are shown to be predictable.
+
+## Phase 3 (v0.1 baseline) — Build/Exit zones, trading layer, backtest
 
 Zones come from the cycle, not from hand-set prices:
 
@@ -194,10 +225,12 @@ On the bundled synthetic sample the engine scores **4 / 6**:
 
 - **Phase 1:** does the cycle exist? → engine + evidence. ✅
 - **Phase 2:** formalise each phase (forward-vol profile) + regime consistency. ✅
-- **Phase 3:** Build/Exit zones, trading layer, backtest, §11 scorecard. ✅
-  *(framework complete; trading edge to be validated/tuned on real market data)*
-- **Next:** feed real Taiwan ETFs / large caps, then stage-2/3 assets
-  (mid/small caps, US ETFs) for cross-market confirmation.
+- **Phase 3 (v0.1):** Build/Exit zones, trading layer, backtest, §11 scorecard. ✅
+  *(real-data result: cycle detection works, but naive trading loses — see v0.2)*
+- **v0.2 (current):** Phase ≠ Trade. Transition model + out-of-sample predictive
+  test (`transitions.py`). Trading rules gated on demonstrated predictive power. ✅
+- **Next:** raise transition AUC with stronger Triggers; only then design a
+  transition-based, direction-symmetric trading layer.
 
 VE is **independent from momentum/trend strategies** by design, so it can become
 a separate Alpha Engine (design §11).
