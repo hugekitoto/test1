@@ -27,7 +27,14 @@ def fetch_yfinance(ticker: str, start: str = "2015-01-01", end: str | None = Non
             f"No data for {ticker}. In the hosted VE environment outbound market "
             "data is blocked — run this locally or use load_csv()."
         )
-    df = df.rename(columns=str.title)[["Open", "High", "Low", "Close", "Volume"]]
+    # Newer yfinance returns a MultiIndex column header (field, ticker) even for
+    # a single symbol. Flatten to just the field level so the saved CSV has a
+    # clean single header row that load_csv() can read.
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    df = df.rename(columns=str.title)
+    df = df.loc[:, ~df.columns.duplicated()]
+    df = df[["Open", "High", "Low", "Close", "Volume"]]
     df.index.name = "Date"
     return df.astype(float)
 
