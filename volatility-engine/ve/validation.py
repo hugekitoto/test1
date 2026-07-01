@@ -246,12 +246,16 @@ def liquidity_test(ann: pd.DataFrame, horizon: int = 5, cfg: VEConfig = DEFAULT,
     (b) Info gain: AUC(price-vol features) vs AUC(price-vol + liquidity features)
         for predicting the next transition.
     """
-    dvol = ann["Volume"].pct_change()
-    dhv = ann["HV"].diff()
+    # log volume change is robust to zero-volume days (pct_change -> inf).
+    dvol = np.log(ann["Volume"].replace(0, np.nan)).diff()
+    dvol = dvol.replace([np.inf, -np.inf], np.nan)
+    dhv = ann["HV"].diff().replace([np.inf, -np.inf], np.nan)
     xcorr = {}
     for L in range(0, max_lag + 1):
         # dvol from L days ago vs today's dHV: L>0 means volume leads volatility
-        xcorr[L] = float(dvol.shift(L).corr(dhv))
+        pair = pd.concat([dvol.shift(L), dhv], axis=1).dropna()
+        xcorr[L] = (float(pair.iloc[:, 0].corr(pair.iloc[:, 1]))
+                    if len(pair) > 30 else float("nan"))
     valid = {L: c for L, c in xcorr.items() if not np.isnan(c)}
     best_lag = max(valid, key=lambda k: abs(valid[k])) if valid else 0
 
