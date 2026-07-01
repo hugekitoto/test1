@@ -58,6 +58,15 @@ def test_transition_model_runs_and_has_signal_on_synthetic():
     assert max(aucs) > 0.55, aucs  # detectable predictive skill somewhere
 
 
+def test_robustness_placebo_collapses():
+    # placebo (shuffled labels) must score near coin-flip and well below full
+    ann = _ann(cycle_len=110, seed=3)
+    r = transitions.robustness_check(ann, horizon=5)
+    assert r["placebo"] < 0.60, r["placebo"]
+    assert r["full"] - r["placebo"] > 0.10, r
+    assert not np.isnan(r["external_target"])
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

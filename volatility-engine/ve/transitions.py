@@ -206,6 +206,84 @@ def fit_transition_model(ann: pd.DataFrame, phase: str, horizon: int = 5,
     }
 
 
+def _time_split_auc(feat_df: pd.DataFrame, y: np.ndarray, train_frac: float = 0.7,
+                    permute: bool = False, seed: int = 0) -> float:
+    """Generic: fit logistic on the first `train_frac`, return AUC on the tail.
+
+    `permute=True` shuffles labels (a placebo) — a healthy pipeline then scores
+    ~0.50. Reused for full / time-only / external-target / placebo checks.
+    """
+    df = feat_df.replace([np.inf, -np.inf], np.nan).copy()
+    df["_y"] = y
+    df = df.dropna()
+    if len(df) < 100 or df["_y"].nunique() < 2:
+        return float("nan")
+    cols = [c for c in df.columns if c != "_y"]
+    yv = df["_y"].to_numpy().astype(float)
+    if permute:
+        yv = np.random.default_rng(seed).permutation(yv)
+    split = int(len(df) * train_frac)
+    Xtr, ytr = df[cols].iloc[:split].to_numpy(), yv[:split]
+    Xte, yte = df[cols].iloc[split:].to_numpy(), yv[split:]
+    if ytr.sum() == 0 or (yte == 1).sum() == 0 or (yte == 0).sum() == 0:
+        return float("nan")
+    Xtr_s, mu, sd = _standardize(Xtr)
+    w = _fit_logistic(Xtr_s, ytr)
+    Xte_s, _, _ = _standardize(Xte, mu, sd)
+    return _auc(yte, _predict(w, Xte_s))
+
+
+def robustness_check(ann: pd.DataFrame, horizon: int = 5, cfg: VEConfig = DEFAULT) -> dict:
+    """Separate genuine predictive power from mechanical artifact.
+
+    Returns mean out-of-sample AUCs for:
+      full            : all features -> self-defined phase-end (the headline)
+      placebo         : same, labels shuffled (should be ~0.50)
+      time_only       : only time_in_phase (pure duration/hazard structure)
+      external_target : features -> "future 10d realised vol > past 10d" — a
+                        target NOT derived from our phase definition, so high AUC
+                        here means the predictability is genuine, not circular.
+      external_placebo: external target with shuffled labels (~0.50 sanity).
+    """
+    feats = build_transition_features(ann, cfg)
+    rem = remaining_days_in_phase(ann)
+    y_phase = (rem <= (horizon - 1)).astype(float).to_numpy()
+    phase_arr = ann["PhaseSmooth"].to_numpy(dtype=object)
+
+    full, placebo, timeonly = [], [], []
+    for ph in PHASES:
+        mask = np.array([p == ph for p in phase_arr])
+        if mask.sum() < 100:
+            continue
+        fdf = feats[mask]
+        yy = y_phase[mask]
+        for acc, kwargs, cols in (
+            (full, {}, FEATURES),
+            (placebo, {"permute": True}, FEATURES),
+            (timeonly, {}, ["time_in_phase"]),
+        ):
+            a = _time_split_auc(fdf[cols], yy, **kwargs)
+            if not np.isnan(a):
+                acc.append(a)
+
+    # External, non-self-referential target: future realised-vol regime.
+    logret = ann["LogRet"]
+    past_rv = logret.rolling(10).std()
+    fut_rv = logret.rolling(10).std().shift(-10)
+    y_ext = (fut_rv > past_rv).astype(float).to_numpy()
+    a_ext = _time_split_auc(feats[FEATURES], y_ext)
+    a_ext_p = _time_split_auc(feats[FEATURES], y_ext, permute=True)
+
+    mean = lambda x: float(np.mean(x)) if x else float("nan")
+    return {
+        "full": mean(full),
+        "placebo": mean(placebo),
+        "time_only": mean(timeonly),
+        "external_target": a_ext,
+        "external_placebo": a_ext_p,
+    }
+
+
 def study_asset(ann: pd.DataFrame, horizon: int = 5, cfg: VEConfig = DEFAULT) -> dict:
     """Run the transition study for every phase of one asset."""
     models = {}
