@@ -181,6 +181,32 @@ The older Build/Exit backtest below is retained as the v0.1 baseline that
 motivated this pivot — it is **not** the recommended path until transitions
 are shown to be predictable.
 
+### The six-layer validation framework
+
+VE's goal is not a high-AUC classifier but to answer: *is there a volatility
+lifecycle that recurs across time, assets and regimes AND carries trading
+value?* The validation stack (`ve/transitions.py` + `ve/validation.py`,
+`scripts/run_validation.py`):
+
+| Layer | Question | Code |
+| --- | --- | --- |
+| 1 existence | Does a volatility cycle exist? | Phase 1 report |
+| 2 not self-referential | Placebo / Time-only / External-target | `transitions.robustness_check` |
+| 3 generality | Cross-Time, Cross-Asset, Regime | `validation.cross_time / cross_asset / regime_auc` |
+| 4 new info | Do new features beat `{time, HV pct}`? | `validation.information_gain` |
+| 5 **trading value** | With a perfect oracle, is a phase tradeable? | `validation.oracle_test` |
+| 6 mechanism | Does liquidity *lead* volatility? | `validation.liquidity_test` |
+
+The **Oracle test** (layer 5) is the decisive gate: it separates *classification
+value* from *trading value*. On the sample, phases show `long_only ≈ 0` (no
+directional edge even with perfect timing) but positive `straddle_net`
+(volatility itself is tradeable) — i.e. any edge is in **volatility, not
+direction**. Run it on real data:
+
+```bash
+python scripts/run_validation.py --data data/real --horizon 5
+```
+
 ## Phase 3 (v0.1 baseline) — Build/Exit zones, trading layer, backtest
 
 Zones come from the cycle, not from hand-set prices:
